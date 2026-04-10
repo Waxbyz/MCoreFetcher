@@ -11,27 +11,13 @@ class VanillaFetcher(BaseFetcher):
     platform_name = "Vanilla"
     platform_uid = 'net.minecraft'
 
-    async def fetch_mc_versions(self) -> list[str]:
-        data = await self.get_json(URL)
-        if not data:
-            return []
-        versions = [v['id'] for v in data['versions']]
-        logging.info(f'Fetched Minecraft {len(versions)} versions(Vanilla)')
-
-        return versions
-
-    async def fetch_builds(self) -> list:
-        logging.warning('Vanilla does not support builds')
-        return []
-    
-    async def fetch_all_versions(self) -> Optional[dict]:
+    async def fetch_mc_versions(self) -> Optional[dict]:
         data = await self.get_json(URL)
         if not data:
             return None
         
         versions = []
 
-        import asyncio
         tasks = [self._fetch_one_version(v) for v in data["versions"]]
         results = await asyncio.gather(*tasks)
         for entry in results:
@@ -45,6 +31,10 @@ class VanillaFetcher(BaseFetcher):
             "uid":           self.platform_uid,
             "versions":      versions
         }
+
+    async def fetch_builds(self) -> list:
+        logging.warning('Vanilla does not support builds')
+        return []
 
     async def _fetch_one_version(self, v: dict) -> Optional[dict]:
         ver_data = await self.get_json(v["url"])
