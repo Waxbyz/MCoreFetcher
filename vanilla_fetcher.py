@@ -47,13 +47,14 @@ class VanillaFetcher(BaseFetcher):
         
         server = downloads["server"]
         return {
-            "mcVersion":   v["id"],
-            "type":        v["type"],
+            "mcVersion": v["id"],
+            "build": None,
+            "type": v["type"],
             "releaseTime": v["releaseTime"],
             "recommended": v["type"] == "release",
             "download": {
                 "name": f"minecraft_server.{v['id']}.jar",
-                "url":  server["url"],
+                "url": server["url"],
                 "sha1": server["sha1"]
             }
         }
