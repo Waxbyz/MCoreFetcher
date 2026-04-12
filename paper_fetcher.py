@@ -52,4 +52,5 @@ class PaperFetcher(BaseFetcher):
                 b['recommended'] == True
                 break
 
-        logging.info(f"Found {len(builds)} builds(Paper)")        
+        logging.info(f"Found {len(builds)} builds(Paper)")
+        return builds        
