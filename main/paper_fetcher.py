@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 import asyncio
 
-from base_fetcher import BaseFetcher
+from main.base_fetcher import BaseFetcher
 
 URL = "https://api.papermc.io/v2/projects/paper"
 

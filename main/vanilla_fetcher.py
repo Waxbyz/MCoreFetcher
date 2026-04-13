@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 import asyncio
 
-from base_fetcher import BaseFetcher
+from main.base_fetcher import BaseFetcher
 
 URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 
