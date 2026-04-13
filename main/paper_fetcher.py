@@ -1,6 +1,4 @@
 import logging
-from typing import Optional
-import asyncio
 
 from main.base_fetcher import BaseFetcher
 
