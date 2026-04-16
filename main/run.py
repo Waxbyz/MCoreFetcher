@@ -4,12 +4,13 @@ import logging
 
 from vanilla_fetcher import VanillaFetcher
 from paper_fetcher import PaperFetcher
+from purpur_fetcher import PurpurFetcher
 from aggregator import aggregate
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
-    fetchers = [VanillaFetcher(), PaperFetcher()]
+    fetchers = [VanillaFetcher(), PaperFetcher(), PurpurFetcher()]
 
     try:
         data = await aggregate(fetchers)
