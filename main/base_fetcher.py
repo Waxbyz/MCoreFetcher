@@ -62,9 +62,5 @@ def platform_uid(self) -> str:
     pass
 
 @abstractmethod
-async def fetch_mc_versions(self) -> list[str]:
-    pass
-
-@abstractmethod
-async def fetch_builds(self) -> list[str]:
+async def fetch(self) -> list[str]:
     pass
