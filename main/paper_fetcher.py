@@ -1,6 +1,7 @@
 import logging
+import asyncio
 
-from main.base_fetcher import BaseFetcher
+from base_fetcher import BaseFetcher
 
 URL = "https://api.papermc.io/v2/projects/paper"
 
@@ -9,14 +10,36 @@ class PaperFetcher(BaseFetcher):
     platform_name = "Paper"
     platform_uid = "io.papermc.paper"
 
-    async def fetch_mc_verions(self) -> list[str]:
-        data = self.get_json(URL)
+    async def fetch(self) -> list[str]:
+        data = await self.get_json(URL)
         if not data:
-            return []
-        return list(reversed(data.get('versions', [])))
+            return None
+        
+        versions = list(reversed(data.get('versions', [])))
+
+        async def fetch_one(version):
+            builds = await self._fetch_builds(version)
+            if not builds:
+                return None
+            
+            return {
+                "version": version,
+                "builds": builds
+            }
+        tasks = [fetch_one(v) for v in versions]
+        results = await asyncio.gather(*tasks)
+
+        versions_data = [r for r in results if r]
+
+        return {
+            "platform": self.platform_id,
+            "name": self.platform_name,
+            "uid": self.platform_uid,
+            "versions": versions_data
+        }
     
-    async def fetch_builds(self, version: str) -> list[int]:
-        data = self.get_json(f"{URL}/versions/{version}/builds")
+    async def _fetch_builds(self, version: str) -> list[int]:
+        data = await self.get_json(f"{URL}/versions/{version}/builds")
         if not data:
             return []
 
@@ -31,7 +54,6 @@ class PaperFetcher(BaseFetcher):
             channel = b.get('channel', 'default')
 
             builds.append({
-            "mcVersion": version,
             "build": str(build),
             "type": channel,
             "releaseTime": b.get('time', ''),
@@ -46,9 +68,9 @@ class PaperFetcher(BaseFetcher):
         builds.sort(key=lambda b: int(b["build"]), reverse=True)
 
         for b in builds:
-            if b['type'] == 'default':
-                b['recommended'] == True
+            if b['type'] == 'STABLE':
+                b['recommended'] = True
                 break
 
         logging.info(f"Found {len(builds)} builds(Paper)")
-        return builds        
+        return builds
