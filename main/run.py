@@ -8,7 +8,6 @@ from aggregator import aggregate
 
 logging.basicConfig(level=logging.INFO)
 
-
 async def main():
     fetchers = [VanillaFetcher(), PaperFetcher()]
 

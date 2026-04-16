@@ -3,6 +3,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 
+logging.basicConfig(level=logging.INFO)
+
 class BaseFetcher(ABC):
     TIMEOUT = aiohttp.ClientTimeout(total=30)
     HEADERS = {"User-Agent": "meta-generator/1.0 (github.com/yourname/meta)"}
