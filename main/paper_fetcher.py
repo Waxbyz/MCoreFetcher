@@ -11,14 +11,14 @@ class PaperFetcher(BaseFetcher):
     platform_name = "Paper"
     platform_uid = "io.papermc.paper"
 
-    async def fetch(self) -> list[str]:
+    async def fetch(self) -> dict:
         data = await self.get_json(URL)
         if not data:
             return None
         
         versions = list(reversed(data.get('versions', [])))
 
-        async def fetch_one(version):
+        async def fetch_one(version) -> dict:
             builds = await self._fetch_builds(version)
             if not builds:
                 return None
@@ -73,5 +73,5 @@ class PaperFetcher(BaseFetcher):
                 b['recommended'] = True
                 break
 
-        logging.info(f"Found {len(builds)} builds(Paper)")
+        logging.info(f"Found {len(builds)} builds(Paper {version})")
         return builds
