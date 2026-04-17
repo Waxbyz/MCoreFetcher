@@ -17,10 +17,14 @@ async def main():
     try:
         data = await aggregate(fetchers)
 
-        with open("dist/meta.json", "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-
-            logging.info("meta.json generated successfully")
+        for platform in data["platforms"]:
+            if not platform:
+                continue
+            platform_id = platform["platform"]
+            platform_file = f"dist/{platform_id}_meta.json"
+            with open(platform_file, "w", encoding="utf-8") as f:
+                json.dump(platform, f, indent=2)
+                logging.info(f"{platform_id}_meta.json generated successfully")
     finally:
         await asyncio.gather(*[f.close() for f in fetchers])
 
