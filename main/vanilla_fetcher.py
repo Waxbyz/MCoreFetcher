@@ -28,7 +28,7 @@ class VanillaFetcher(BaseFetcher):
                 return None
         
             server = downloads["server"]
-            logging.info(f"Fetched {v["id"]} Minecraft version(Vanilla)")
+            logging.info(f"Fetched {v['id']} Minecraft version(Vanilla)")
             return {
                 "mcVersion": v["id"],
                 "builds": [
