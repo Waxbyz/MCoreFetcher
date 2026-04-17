@@ -7,7 +7,7 @@ logging.basicConfig(level=logging.INFO)
 
 class BaseFetcher(ABC):
     TIMEOUT = aiohttp.ClientTimeout(total=30)
-    HEADERS = {"User-Agent": "meta-generator/1.0 (github.com/yourname/meta)"}
+    HEADERS = {"User-Agent": "meta-generator/1.0 (github.com/waxbyz/mcorefetcher)"}
 
     def __init__(self):
         self._session: Optional[aiohttp.ClientSession] = None
