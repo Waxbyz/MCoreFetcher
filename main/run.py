@@ -6,12 +6,13 @@ import os
 from vanilla_fetcher import VanillaFetcher
 from paper_fetcher import PaperFetcher
 from purpur_fetcher import PurpurFetcher
+from fabric_fetcher import FabricFetcher
 from aggregator import aggregate
 
 logging.basicConfig(level=logging.INFO)
 
 async def main():
-    fetchers = [VanillaFetcher(), PaperFetcher(), PurpurFetcher()]
+    fetchers = [VanillaFetcher(), PaperFetcher(), PurpurFetcher(), FabricFetcher()]
     os.makedirs("dist", exist_ok=True)
 
     try:
