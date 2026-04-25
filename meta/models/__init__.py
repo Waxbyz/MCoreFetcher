@@ -13,7 +13,7 @@ class MetaBuild(BaseModel):
     build: Optional[str] = None
     type: str = "release"
     release_time: Optional[str] = Field(None, alias="releaseTime")
-    recommeded: bool = False
+    recommended: bool = False
     download: MetaDownload
 
     model_config = {"populate_by_name": True}
@@ -25,11 +25,11 @@ class MetaVersionEntry(BaseModel):
 
     model_config = {"populate_by_name": True}
 
-class MetaPackege(BaseModel):
+class MetaPackage(BaseModel):
     format_version: int = Field(1, alias="formatVersion")
     uid: str
     name: str
-    recommeded: list[str] = []
+    recommended: list[str] = []
     versions: list[MetaVersionEntry]
 
     model_config = {"populate_by_name": True}

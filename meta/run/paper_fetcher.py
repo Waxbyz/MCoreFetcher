@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from base_fetcher import BaseFetcher
+from meta.run.base_fetcher import BaseFetcher
 
 URL = "https://api.papermc.io/v2/projects/paper"
 logging.basicConfig(level=logging.INFO)

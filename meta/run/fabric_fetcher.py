@@ -1,7 +1,7 @@
 import logging
 import asyncio
 
-from base_fetcher import BaseFetcher
+from meta.run.base_fetcher import BaseFetcher
 
 URL = "https://meta.fabricmc.net/v2/versions"
 logging.basicConfig(level=logging.INFO)

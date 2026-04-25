@@ -2,7 +2,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from base_fetcher import BaseFetcher
+from meta.run.base_fetcher import BaseFetcher
 
 URL = "https://api.purpurmc.org/v2/purpur/"
 logging.basicConfig(level=logging.INFO)
