@@ -1,0 +1,45 @@
+name: Update
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout generator repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run generator
+        run: python -m meta.run.run
+
+      - name: Checkout meta repo
+        uses: actions/checkout@v4
+        with:
+          repository: ServerLauncher/meta-launcher
+          token: ${{ secrets.META_DEPLOY_TOKEN }}
+          path: meta-output
+
+      - name: Copy generated files
+        run: |
+          cp -r dist/* meta-output/
+
+      - name: Commit and push
+        run: |
+          cd meta-output
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "Update $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push
