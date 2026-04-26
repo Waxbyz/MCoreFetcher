@@ -4,7 +4,7 @@ from typing import Optional
 from . import MetaDownload, MetaBuild, MetaVersionEntry, MetaPackage, MetaVersionFile
 
 class PaperApplicationDownload(BaseModel):
-    name: set
+    name: str
     sha256: str
 
 class PaperBuildDownloads(BaseModel):

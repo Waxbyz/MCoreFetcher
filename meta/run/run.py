@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from meta.run.mojang_fetcher import MojangFetcher
+from meta.run.paper_fetcher import PaperFetcher
 from meta.models import MetaIndex, MetaIndexEntry
 from meta.common import sha256, write_json
 
@@ -14,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 async def main():
     logging.info("Starting meta build process")
 
-    fetchers = [MojangFetcher()]
+    fetchers = [MojangFetcher(), PaperFetcher()]
     os.makedirs("dist", exist_ok=True)
     output = Path("dist")
 

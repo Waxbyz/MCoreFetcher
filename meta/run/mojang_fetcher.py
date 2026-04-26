@@ -22,29 +22,25 @@ class MojangFetcher(BaseFetcher):
     platform_name = "Mojang"
     platform_uid = "net.minecraft"
 
-    async def fetch(
-        self,
-    ) -> Optional[tuple[MojangMetaVersion, dict[str, MojangMetaVersionFile]]]:
-        logger.info("Fetching Mojang manifest...")
+    async def fetch(self) -> Optional[tuple[MojangMetaVersion, dict[str, MojangMetaVersionFile]]]:
+        logger.info("[Mojang] Fetching Mojang manifest...")
 
         raw_manifest = await self.get_json(URL)
         if not raw_manifest:
-            logger.error("Failed to fetch manifest")
+            logger.error("[Mojang] Failed to fetch manifest")
             return None
 
         manifest = MojangVersionManifest(**raw_manifest)
-        logger.info(f"Loaded {len(manifest.versions)} versions")
+        logger.info(f"[Mojang] Loaded {len(manifest.versions)} versions")
 
         semaphore = asyncio.Semaphore(10)
 
         async def fetch_one(entry):
             async with semaphore:
-                logger.debug(f"Fetching version: {entry.id}")
+                logger.debug(f"[Mojang] Fetching version: {entry.id}")
                 return await self._fetch_version(entry)
 
-        tasks = await asyncio.gather(
-            *[fetch_one(entry) for entry in manifest.versions]
-        )
+        tasks = await asyncio.gather(*[fetch_one(entry) for entry in manifest.versions])
 
         version_files: dict[str, MojangMetaVersionFile] = {}
         version_entries: list[MojangMetaVersionEntry] = []
@@ -52,7 +48,7 @@ class MojangFetcher(BaseFetcher):
 
         for entry, version_file in zip(manifest.versions, tasks):
             if not version_file:
-                logger.debug(f"Skipping {entry.id} (no server)")
+                logger.debug(f"[Mojang] Skipping {entry.id} (no server)")
                 continue
 
             version_files[entry.id] = version_file
@@ -68,7 +64,7 @@ class MojangFetcher(BaseFetcher):
 
             recommended = [manifest.latest.release]
 
-        logger.info(f"Processed {len(version_entries)} valid versions")
+        logger.info(f"[Mojang] Processed {len(version_entries)} valid versions")
 
         package = MojangMetaVersion(
             uid=self.platform_uid,
@@ -79,14 +75,12 @@ class MojangFetcher(BaseFetcher):
 
         return package, version_files
 
-    async def _fetch_version(
-        self, entry
-    ) -> Optional[MojangMetaVersionFile]:
-        logger.debug(f"Downloading version data: {entry.id}")
+    async def _fetch_version(self, entry) -> Optional[MojangMetaVersionFile]:
+        logger.debug(f"[Mojang] Downloading version data: {entry.id}")
 
         raw = await self.get_json(entry.url)
         if not raw:
-            logger.error(f"Failed to fetch version: {entry.id}")
+            logger.error(f"[Mojang] Failed to fetch version: {entry.id}")
             return None
 
         version = MojangVersion(**raw)
@@ -98,8 +92,8 @@ class MojangFetcher(BaseFetcher):
         )
 
         if result:
-            logger.debug(f"Built meta for {entry.id}")
+            logger.debug(f"[Mojang] Built meta for {entry.id}")
         else:
-            logger.debug(f"No server for {entry.id}")
+            logger.debug(f"[Mojang] No server for {entry.id}")
 
         return result
