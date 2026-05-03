@@ -1,10 +1,20 @@
-import asyncio
 import logging
-from datetime import datetime, timezone
+import asyncio
+from typing import Optional
 
 from meta.run.base_fetcher import BaseFetcher
+from meta.models.purpur_model import (
+    PurpurProjectResponse,
+    PurpurBuildsResponse,
+    PurpurBuildInfo,
+    PurpurMetaVersionFile,
+    PurpurMetaVersionEntry,
+    PurpurMetaVersion
+)
 
-URL = "https://api.purpurmc.org/v2/purpur/"
+URL = "https://api.purpurmc.org/v2/purpur"
+
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 class PurpurFetcher(BaseFetcher):
@@ -12,72 +22,98 @@ class PurpurFetcher(BaseFetcher):
     platform_name = "Purpur"
     platform_uid = "build.purpurmc.purpur"
 
-    async def fetch(self) -> dict:
-        data = await self.get_json(URL)
-        if not data:
+    async def fetch(self) -> Optional[tuple[PurpurMetaVersion, dict[str, PurpurMetaVersionFile]]]:
+        logger.info("[Purpur] Fetching project info...")
+
+        raw_project = await self.get_json(URL)
+        if not raw_project:
+            logger.error("[Purpur] Failed to fetch project info")
             return None
-        
-        versions = list(reversed(data.get('versions', [])))
 
-        async def fetch_one(version) -> dict:
-            builds = await self._fetch_builds(version)
-            if not builds:
-                return None
+        project = PurpurProjectResponse(**raw_project)
+        mc_versions = list(reversed(project.versions))
+        logger.info(f"[Purpur] Loaded {len(mc_versions)} MC versions")
 
-            return {
-                "version": version,
-                "builds": builds
-            }
+        semaphore = asyncio.Semaphore(10)
 
-        tasks = [fetch_one(v) for v in versions]
-        results = await asyncio.gather(*tasks)
+        async def fetch_one(mc_version: str):
+            async with semaphore:
+                logger.debug(f"[Purpur] Fetching builds for {mc_version}")
+                return await self._fetch_builds(mc_version)
 
-        versions_data = [r for r in results if r]
+        tasks = await asyncio.gather(*[fetch_one(v) for v in mc_versions])
 
-        return {
-            "platform": self.platform_id,
-            "name": self.platform_name,
-            "uid": self.platform_uid,
-            "versions": versions_data
-        }
-        
-    async def _fetch_builds(self, version: str):
-        data = await self.get_json(f"{URL}{version}")
-        if not data:
-            return []
+        version_files: dict[str, PurpurMetaVersionFile] = {}
+        version_entries: list[PurpurMetaVersionEntry] = []
+        recommended: list[str] = []
 
-        builds = []
+        for mc_version, version_file in zip(mc_versions, tasks):
+            if not version_file:
+                logger.debug(f"[Purpur] Skipping {mc_version} (no builds)")
+                continue
 
-        async def fetch_one_build(b):
-            info = await self.get_json(f"{URL}{version}/{b}")
-            if not info:
-                return None
+            latest_build = version_file.builds[0].build if version_file.builds else ""
 
-            ts = info.get("timestamp")
-            release_time = ""
-            if ts:
-                release_time = datetime.fromtimestamp(ts / 1000, timezone.utc).isoformat()
+            version_files[mc_version] = version_file
 
-            return {
-                "build": str(b),
-                "type": "default",
-                "releaseTime": release_time,
-                "recommended": False,
-                "download": {
-                    "name": f"purpur-{version}-{b}.jar",
-                    "url": f"{URL}{version}/{b}/download",
-                    "md5": info.get("md5", "")
-                }
-            }
+            version_entries.append(PurpurMetaVersionEntry(
+                    mcVersion=mc_version,
+                    latestBuild=latest_build,
+                    sha256="",
+                    url=f"{self.platform_uid}/{mc_version}.json"
+                )
+            )
+            if not recommended:
+                recommended.append(mc_version)
 
-        tasks = [fetch_one_build(b) for b in data.get("builds", {}).get("all", [])]
-        results = await asyncio.gather(*tasks)
+        logger.info(f"[Purpur] Processed {len(version_entries)} MC versions")
 
-        builds = [r for r in results if r]
+        package = PurpurMetaVersion(
+            uid=self.platform_id,
+            name=self.platform_name,
+            recommended=recommended,
+            versions=version_entries
+        )
 
-        builds.sort(key=lambda b: int(b["build"]), reverse=True)
+        return package, version_files
 
-        if builds:
-            builds[0]["recommended"] = True
+    async def _fetch_builds(self, mc_version: str) -> Optional[PurpurMetaVersionFile]:
+        raw = await self.get_json(f"{URL}/{mc_version}")
+        if not raw:
+            logger.error(f"[Purpur] Failed to fetch builds for {mc_version}")
+            return None
 
-        return builds
+        response = PurpurBuildsResponse(**raw)
+
+        if not response.all_builds:
+            logger.debug(f"[Purpur] No builds for {mc_version}")
+            return None
+
+        semaphore = asyncio.Semaphore(10)
+
+        async def fetch_build_info(build_num: int):
+            async with semaphore:
+                raw_info = await self.get_json(f"{URL}/{mc_version}/{build_num}")
+                if not raw_info:
+                    return None
+                return build_num, PurpurBuildInfo(**raw_info)
+
+        build_tasks = await asyncio.gather(*[fetch_build_info(b) for b in response.all_builds])
+        builds_with_info = [(num, info) for num, info in build_tasks if info]
+
+        builds_with_info.sort(key=lambda x: x[0], reverse=True)
+
+        if not builds_with_info:
+            logger.debug(f"[Purpur] No valid builds for {mc_version}")
+            return None
+
+        result = PurpurMetaVersionFile.from_purpur_builds(
+            mc_version=mc_version,
+            builds=builds_with_info,
+            uid=self.platform_uid
+        )
+
+        if result:
+            logger.debug(f"[Purpur] Built meta for {mc_version} — {len(builds_with_info)} builds")
+
+        return result
