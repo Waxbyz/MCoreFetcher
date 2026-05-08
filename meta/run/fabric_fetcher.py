@@ -39,6 +39,7 @@ class FabricFetcher(BaseFetcher):
 
         game_versions = [FabricGameVersion(**v) for v in raw_versions]
         mc_versions = [v.version for v in game_versions]
+        game_stable_map = {v.version: v.stable for v in game_versions}
         logger.info(f"[Fabric] Loaded {len(mc_versions)} MC versions")
 
         installer_version = await self._fetch_installer_version()
@@ -78,7 +79,8 @@ class FabricFetcher(BaseFetcher):
                 )
             )
 
-            if not recommended:
+            game_stable = game_stable_map.get(mc_version, False)
+            if not recommended and game_stable:
                 recommended.append(mc_version)
 
         logger.info(f"[Fabric] Processed {len(version_entries)} MC versions")
