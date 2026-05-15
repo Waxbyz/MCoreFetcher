@@ -9,6 +9,7 @@ from meta.run.mojang_fetcher import MojangFetcher
 from meta.run.paper_fetcher import PaperFetcher
 from meta.run.purpur_fetcher import PurpurFetcher
 from meta.run.fabric_fetcher import FabricFetcher
+from meta.run.java_fetcher import MojangJavaFetcher
 from meta.models import MetaIndex, MetaIndexEntry
 from meta.common import sha256, write_json
 
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 async def main():
     logging.info("Starting meta build process")
 
-    fetchers = [MojangFetcher(), PaperFetcher(), PurpurFetcher(), FabricFetcher()]
+    fetchers = [MojangFetcher(), PaperFetcher(), PurpurFetcher(), FabricFetcher(), MojangJavaFetcher()]
     os.makedirs("dist", exist_ok=True)
     output = Path("dist")
 
@@ -48,7 +49,7 @@ async def main():
                     version_str = json.dumps(version_json)
 
                     for entry in package.versions:
-                        if entry.mc_version == mc_version:
+                        if getattr(entry, "mc_version", None) == mc_version or getattr(entry, "java_version", None) == mc_version:
                             entry.sha256 = sha256(version_str)
                             break
 
