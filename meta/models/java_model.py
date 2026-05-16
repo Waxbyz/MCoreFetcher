@@ -31,12 +31,15 @@ class AdoptiumVersion(BaseModel):
     model_config = {"extra": "ignore"}
 
 class AdoptiumEntry(BaseModel):
-    binary: AdoptiumBinary
+    binaries: list[AdoptiumBinary]
     release_name: str
     vendor: str
-    version: AdoptiumVersion
+    version_data: AdoptiumVersion = Field(alias="version_data")
 
-    model_config = {"extra": "ignore"}
+    model_config = {
+        "extra": "ignore",
+        "populate_by_name": True
+    }
 
 #Mojang
 class MojangJavaManifest(BaseModel):
@@ -70,7 +73,7 @@ class JavaVersionInfo(BaseModel):
     security: int
 
 class JavaBuild(BaseModel):
-    checksum: Optional[JavaChecksum] = None    
+    checksum: Optional[JavaChecksum] = None
     download_type: str = Field(alias="downloadType")
     name: str
     release_time: Optional[str] = Field(None, alias="releaseTime")
@@ -79,43 +82,60 @@ class JavaBuild(BaseModel):
     package_type: str = Field("jre", alias="packageType")
     url: str
     vendor: str
-    version_info: JavaVersionInfo
+    version_info: JavaVersionInfo = Field(alias="versionInfo")
 
     model_config = {"populate_by_name": True}
 
     @classmethod
-    def from_adoptium(cls, entry: AdoptiumEntry, recommended: bool) -> "JavaBuild":
-        v = entry.version
+    def from_adoptium(
+        cls,
+        entry: AdoptiumEntry,
+        binary: AdoptiumBinary,
+        recommended: bool
+    ) -> "JavaBuild":
 
-        name = f"eclipse_temurin_jre{v.major}.{v.minor}.{v.security}+{v.build}"
+        v = entry.version_data
+
+        name = (
+            f"eclipse_temurin_jre"
+            f"{v.major}.{v.minor}.{v.security}+{v.build}"
+        )
 
         checksum = None
-        if entry.binary.package.checksum:
+
+        if binary.package.checksum:
             checksum = JavaChecksum(
-                hash=entry.binary.package.checksum,
+                hash=binary.package.checksum,
                 type="sha256"
             )
-        
+
         return cls(
-            checksum=checksum,            
+            checksum=checksum,
             download_type="archive",
             name=name,
-            release_time=entry.binary.updated_at,
+            release_time=binary.updated_at,
             release_name=entry.release_name,
             recommended=recommended,
             package_type="jre",
-            url=entry.binary.package.link,
+            url=binary.package.link,
             vendor=entry.vendor,
-            version_info=JavaVersionInfo(
+            versionInfo=JavaVersionInfo(
                 build=v.build,
                 major=v.major,
                 minor=v.minor,
                 security=v.security
             )
         )
-    
+
     @classmethod
-    def from_mojang(cls, runtime: MojangJavaRuntime, recommended: bool, component: str, major: int) -> "JavaBuild":
+    def from_mojang(
+        cls,
+        runtime: MojangJavaRuntime,
+        recommended: bool,
+        component: str,
+        major: int
+    ) -> "JavaBuild":
+
         v = runtime.version
 
         parts = v.name.split(".")
@@ -135,26 +155,34 @@ class JavaBuild(BaseModel):
             package_type="jre",
             url=runtime.manifest.url,
             vendor="Mojang",
-            version_info=JavaVersionInfo(
+            versionInfo=JavaVersionInfo(
                 build=0,
                 major=major,
                 minor=minor,
                 security=security
             )
         )
-    
+
 class JavaVersionFile(BaseModel):
     format_version: int = Field(1, alias="formatVersion")
     uid: str
     major: int
     platforms: dict[str, list[JavaBuild]]
 
+    model_config = {"populate_by_name": True}
+
     @classmethod
-    def from_runtimes(cls, major: int, uid: str, platforms: dict[str, list[JavaBuild]]) -> "JavaVersionFile":
-        index = cls(
+    def from_runtimes(
+        cls,
+        major: int,
+        uid: str,
+        platforms: dict[str, list[JavaBuild]]
+    ) -> "JavaVersionFile":
+        return cls(
             uid=uid,
             major=major,
-            platforms=dict)
+            platforms=platforms
+        )
 
 class JavaVersionEntry(BaseModel):
     java_version: str = Field(alias="javaVersion")

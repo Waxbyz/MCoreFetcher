@@ -1,8 +1,10 @@
 import logging
+import asyncio
 from typing import Optional
 
 from meta.run.base_fetcher import BaseFetcher
 from meta.models.java_model import (
+    AdoptiumEntry,
     MojangJavaRuntime,
     JavaBuild,
     JavaVersionFile,
@@ -10,10 +12,10 @@ from meta.models.java_model import (
     JavaMetaPackage
 )
 
-ADOPTIUM_API = "https://api.adoptium.net/v3/assets/latest/{major}/hotspot"
+ADOPTIUM_API = "https://api.adoptium.net/v3/assets/feature_releases/{major}/ga?image_type=jre"
 MOJANG_JAVA_URL = ("https://piston-meta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json")
 
-JAVA_MAJORS = [8, 17, 21, 25]
+JAVA_MAJORS = [8, 11, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 
 MOJANG_COMPONENTS = {
     "jre-legacy": 8,
@@ -90,7 +92,7 @@ class MojangJavaFetcher(BaseFetcher):
             version_entries: list[JavaVersionEntry] = []
 
             for major, platforms in sorted(builds_by_major.items()):
-                key = f"java-{major}"
+                key = f"java{major}"
 
                 version_file = JavaVersionFile(
                     uid=key,
@@ -118,4 +120,119 @@ class MojangJavaFetcher(BaseFetcher):
         )
 
         logger.info(f"[MojangJava] Done — {len(version_files)} Java versions")
-        return meta_package, version_files   
+        return meta_package, version_files
+
+class AdoptiumJavaFetcher(BaseFetcher):
+    platform_id   = "java"
+    platform_name = "Java Runtimes"
+    platform_uid  = "net.adoptium.java"
+
+    async def fetch(self) -> Optional[tuple[JavaMetaPackage, dict[str, JavaVersionFile]]]:
+        logger.info("[Adoptium] Fetching Java runtimes...")
+
+        semaphore = asyncio.Semaphore(5)
+
+        async def fetch_one(major: int):
+            async with semaphore:
+                return await self._fetch_major(major=major)
+
+        results = await asyncio.gather(*[fetch_one(m) for m in JAVA_MAJORS])
+
+        version_files:   dict[str, JavaVersionFile] = {}
+        version_entries: list[JavaVersionEntry]     = []
+
+        for major, result in zip(JAVA_MAJORS, results):
+            if not result:
+                continue
+
+            key = f"java{major}"
+            version_files[key] = result
+
+            version_entries.append(JavaVersionEntry(
+                javaVersion=key,
+                major=major,
+                sha256="",
+                url=f"{self.platform_uid}/{key}.json"
+            ))
+
+        package = JavaMetaPackage(
+            uid=self.platform_uid,
+            name=self.platform_name,
+            recommended=[],
+            versions=version_entries
+        )
+
+        logger.info(f"[Adoptium] Done — {len(version_files)} Java versions")
+        return package, version_files
+
+    async def _fetch_major(self, major: int) -> Optional[JavaVersionFile]:
+        url = ADOPTIUM_API.format(major=major)
+
+        raw = await self.get_json(url)
+        if not raw:
+            logger.warning(f"[Adoptium] Failed to fetch Java {major}")
+            return None
+
+        entries = [AdoptiumEntry(**e) for e in raw]
+
+        platforms: dict[str, list[JavaBuild]] = {}
+
+        all_builds: list[tuple[AdoptiumEntry, any]] = []
+
+        for entry in entries:
+            for binary in entry.binaries:
+                if binary.image_type != "jre":
+                    continue
+
+                all_builds.append((entry, binary))
+
+        if not all_builds:
+            logger.warning(f"[Adoptium] No JRE entries for Java {major}")
+            return None
+
+        latest_build = max(all_builds, key=lambda x: (
+            x[0].version_data.major, 
+            x[0].version_data.minor, 
+            x[0].version_data.security, 
+            x[0].version_data.build or 0))[0].release_name
+
+        for entry, binary in all_builds:
+            key = (binary.os, binary.architecture)
+
+            platform_name = ADOPTIUM_PLATFORM_MAP.get(key)
+            if not platform_name:
+                logger.debug(f"[Adoptium] Unknown platform {key}, skipping")
+                continue
+
+            if platform_name not in platforms:
+                platforms[platform_name] = []
+
+            recommended = entry.release_name == latest_build
+
+            build = JavaBuild.from_adoptium(
+                entry=entry,
+                binary=binary,
+                recommended=recommended
+            )
+
+            platforms[platform_name].append(build)
+
+        for builds in platforms.values():
+            builds.sort(
+                key=lambda b: (
+                    b.version_info.major,
+                    b.version_info.minor,
+                    b.version_info.security,
+                    b.version_info.build
+                ),
+                reverse=True
+            )
+
+        total = sum(len(b) for b in platforms.values())
+        logger.info(f"[Adoptium] Java {major} — {len(platforms)} platforms, {total} builds")
+
+        return JavaVersionFile(
+            uid=f"java{major}",
+            major=major,
+            platforms=platforms
+        )
